@@ -6,14 +6,20 @@ use lettre::{
 
 use crate::{
     config::Config, email_system::EmailTask,
-    template::registration_successful::AttendeeRegistrationSuccessful,
+    template::registration_successful::attendee_registration_successful,
 };
 
 pub async fn send_email_logic(config: &Config, task: &EmailTask) -> Result<(), String> {
     let singlepart;
 
     if task.category == "Attendee_Registration_Successful" {
-        singlepart = SinglePart::html(AttendeeRegistrationSuccessful(&task.category));
+        match attendee_registration_successful(&task.first_name) {
+            Ok(body) => {
+                singlepart = SinglePart::html(body);
+            }
+
+            Err(e) => return Err(e),
+        }
     } else {
         singlepart = SinglePart::plain(Body::new(vec![]));
     }
