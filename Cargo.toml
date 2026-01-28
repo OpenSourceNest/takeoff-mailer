@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-prost = "0.12"
+prost = "0.14.3"
 lapin = "2.3"
 tokio = { version = "1", features = ["full"] }
 futures-util = "0.3.31"
@@ -12,6 +12,7 @@ prost-types = "0.14.3"
 dotenvy = "0.15.7"
 lettre = "0.11.19"
 tera = "1.20.1"
+chrono = "0.4.43"
 
 [build-dependencies]
-prost-build = "0.12"
+prost-build = "0.14.3"
