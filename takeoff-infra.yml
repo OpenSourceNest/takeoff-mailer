@@ -41,7 +41,7 @@ services:
       - takeoff_internal
 
   api:
-    image: ghcr.io/OpenSourceNest/takeoff-backend:latest
+    image: ghcr.io/opensourcenest/takeoff-backend:latest
     container_name: takeoff_api
     restart: always
     depends_on:
@@ -57,7 +57,7 @@ services:
       - takeoff_internal
 
   mailer:
-    image: ghcr.io/OpenSourceNest/takeoff-mailer:latest
+    image: ghcr.io/opensourcenest/takeoff-mailer:latest
     container_name: takeoff_mailer
     restart: always
     depends_on:
