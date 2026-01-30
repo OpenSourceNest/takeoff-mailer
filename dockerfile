@@ -1,4 +1,4 @@
-FROM rust:1.85-alpine as builder
+FROM rust:1.93-alpine3.23 as builder
 WORKDIR /app
 RUN apk add --no-cache musl-dev protobuf-dev
 COPY . .
