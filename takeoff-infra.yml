@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: takeoff_db
+    restart: always
+    environment:
+      POSTGRES_DB: takeoff_events
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 2G  # Optimized for 8GB RAM VPS
+    networks:
+      - takeoff_internal
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: takeoff_mq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${MQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${MQ_PASSWORD}
+    ports:
+      - "15672:15672" # Management UI (Protect with firewall/Cloudflare)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - takeoff_internal
+
+  api:
+    image: ghcr.io/OpenSourceNest/takeoff-backend:latest
+    container_name: takeoff_api
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db:5432/takeoff_2026
+      RABBITMQ_URL: amqp://${MQ_USER}:${MQ_PASSWORD}@rabbitmq:5672
+      PORT: 4500
+    networks:
+      - takeoff_internal
+
+  mailer:
+    image: ghcr.io/OpenSourceNest/takeoff-mailer:latest
+    container_name: takeoff_mailer
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_URL: amqp://${MQ_USER}:${MQ_PASSWORD}@rabbitmq:5672
+    networks:
+      - takeoff_internal
+
+networks:
+  takeoff_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
