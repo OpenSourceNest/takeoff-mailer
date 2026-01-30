@@ -6,7 +6,7 @@ services:
     container_name: takeoff_db
     restart: always
     environment:
-      POSTGRES_DB: takeoff_events
+      POSTGRES_DB: takeoff_2026
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
@@ -15,6 +15,11 @@ services:
       resources:
         limits:
           memory: 2G  # Optimized for 8GB RAM VPS
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d takeoff_2026"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - takeoff_internal
 
