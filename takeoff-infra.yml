@@ -1,22 +1,22 @@
-version: '3.8'
+# This is the Docker Compose configuration for Takeoff's infrastructure components.
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: takeoff_db
+    container_name: ${COMPOSE_PROJECT_NAME}_db
     restart: always
     environment:
-      POSTGRES_DB: takeoff_2026
+      POSTGRES_DB: ${COMPOSE_PROJECT_NAME}_2026
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
     deploy:
       resources:
         limits:
-          memory: 2G  # Optimized for 8GB RAM VPS
+          memory: 2G
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d takeoff_2026"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,15 +25,15 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: takeoff_mq
+    container_name: ${COMPOSE_PROJECT_NAME}_mq
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: ${MQ_USER}
       RABBITMQ_DEFAULT_PASS: ${MQ_PASSWORD}
     ports:
-      - "15672:15672" # Management UI (Protect with firewall/Cloudflare)
+      - "${MQ_MANAGEMENT_PORT}:15672" # Management UI (Protect with firewall/Cloudflare)
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,7 +42,7 @@ services:
 
   api:
     image: ghcr.io/opensourcenest/takeoff-backend:latest
-    container_name: takeoff_api
+    container_name: ${COMPOSE_PROJECT_NAME}_api
     restart: always
     depends_on:
       db:
@@ -50,27 +50,61 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db:5432/takeoff_2026
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${COMPOSE_PROJECT_NAME}_2026
       RABBITMQ_URL: amqp://${MQ_USER}:${MQ_PASSWORD}@rabbitmq:5672
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       PORT: 4500
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     networks:
       - takeoff_internal
 
   mailer:
     image: ghcr.io/opensourcenest/takeoff-mailer:latest
-    container_name: takeoff_mailer
+    container_name: ${COMPOSE_PROJECT_NAME}_mailer
     restart: always
     depends_on:
       rabbitmq:
         condition: service_healthy
     environment:
       RABBITMQ_URL: amqp://${MQ_USER}:${MQ_PASSWORD}@rabbitmq:5672
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_SENDER: ${MAIL_SENDER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     networks:
       - takeoff_internal
+
+  tunnel:
+      image: cloudflare/cloudflared:latest
+      container_name: ${COMPOSE_PROJECT_NAME}_tunnel
+      restart: always
+      environment:
+        - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+      command: tunnel run
+      networks:
+        - takeoff_internal
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: ${COMPOSE_PROJECT_NAME}_logs
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - takeoff_internal
+    restart: always
 
 networks:
   takeoff_internal:
     driver: bridge
 
 volumes:
-  postgres_data:
+  db_data:
+    name: ${COMPOSE_PROJECT_NAME}_db_data
