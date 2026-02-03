@@ -62,21 +62,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("[SYSTEM] Connected to RabbitMQ. Awaiting tasks...");
 
-    if let Err(e) = channel
-        .queue_declare(
-            &QUEUE_NAME,
-            QueueDeclareOptions {
-                durable: true,
-                ..QueueDeclareOptions::default()
-            },
-            FieldTable::default(),
-        )
-        .await
-    {
-        eprintln!("[CRITICAL] Failed to declare queue: {}", e);
-        panic!("Cannot proceed without RabbitMQ queue");
-    };
-
     if let Err(e) = channel.basic_qos(10, BasicQosOptions::default()).await {
         eprintln!("[CRITICAL] Failed to set QoS: {}", e);
         panic!("Cannot proceed without RabbitMQ QoS");

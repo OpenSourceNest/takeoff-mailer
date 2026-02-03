@@ -18,7 +18,10 @@ pub async fn setup_dlx(channel: &mut Channel) -> Result<(), Error> {
         .exchange_declare(
             DLX_EXCHANGE_NAME,
             ExchangeKind::Direct,
-            ExchangeDeclareOptions::default(),
+            ExchangeDeclareOptions {
+                durable: true,
+                ..ExchangeDeclareOptions::default()
+            },
             FieldTable::default(),
         )
         .await?;
@@ -35,7 +38,7 @@ pub async fn setup_dlx(channel: &mut Channel) -> Result<(), Error> {
         )
         .await?;
 
-    // 3. Bind the Quarantine Queue to the DLX
+    // Bind the Quarantine Queue to the DLX
     channel
         .queue_bind(
             QUARANTINE_QUEUE_NAME,
@@ -46,7 +49,7 @@ pub async fn setup_dlx(channel: &mut Channel) -> Result<(), Error> {
         )
         .await?;
 
-    // 4. Declare the MAIN Queue with DLX arguments
+    // Declare the MAIN Queue with DLX arguments
     let mut queue_args = FieldTable::default();
     queue_args.insert(
         ShortString::from("x-dead-letter-exchange"),
