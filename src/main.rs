@@ -1,10 +1,10 @@
-use crate::util::date_and_time::log_timestamp;
+use crate::{dlx::setup_dlx, util::date_and_time::log_timestamp};
 use futures_util::stream::StreamExt;
 use lapin::{
     BasicProperties, Connection, ConnectionProperties,
     options::{
-        BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, BasicQosOptions,
-        BasicRejectOptions, QueueDeclareOptions,
+        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
+        BasicQosOptions, BasicRejectOptions, QueueDeclareOptions,
     },
     types::FieldTable,
 };
@@ -12,6 +12,7 @@ use prost::Message;
 use std::error::Error;
 
 mod config;
+mod dlx;
 mod mail;
 mod template;
 mod util;
@@ -41,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         };
 
-    let channel = match rabbit_connection.create_channel().await {
+    let mut channel = match rabbit_connection.create_channel().await {
         Ok(c) => c,
 
         Err(e) => {
@@ -49,6 +50,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
             panic!("Cannot proceed without RabbitMQ channel");
         }
     };
+
+    match setup_dlx(&mut channel).await {
+        Ok(_) => (),
+
+        Err(e) => {
+            eprintln!("[CRITICAL] Failed to set up DLX: {}", e);
+            panic!("Cannot proceed without RabbitMQ DLX");
+        }
+    }
 
     println!("[SYSTEM] Connected to RabbitMQ. Awaiting tasks...");
 
@@ -163,11 +173,18 @@ async fn handle_retry(
 
         println!("[RETRY] Re-queued task. Attempt: {}", task.retry_count);
     } else {
-        println!("[DROP] Max retries reached for {}", task.to);
-    }
+        println!(
+            "[DROP] Max retries reached for {}. Sending to DLX.",
+            task.to
+        );
 
-    // Acknowledge the old message so it's removed; we've already handled the "retry" via publish
-    delivery.ack(BasicAckOptions::default()).await?;
+        delivery
+            .nack(BasicNackOptions {
+                requeue: false,
+                multiple: false,
+            })
+            .await?;
+    }
 
     Ok(())
 }
